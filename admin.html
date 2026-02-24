@@ -29,7 +29,7 @@
 </div>
 
 <script>
-    // ВСТАВЬ СВОЙ MASTER KEY
+    // ВСТАВЬ СВОЙ MASTER KEY В КАВЫЧКИ НИЖЕ
     const KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
 
     async function makeTours() {
@@ -48,15 +48,14 @@
             temp.splice(1, 0, temp.pop());
         }
 
-        st.innerText = "⏳ Отправка данных в облако...";
+        st.innerText = "⏳ Отправка в облако...";
         
         const baseData = {
-            tournament: { schedule, updatedAt: Date.now() },
+            tournament: { schedule: schedule, updatedAt: Date.now() },
             live: { teamA: "Команда А", teamB: "Команда Б", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false }
         };
 
         try {
-            // ЖЕСТКИЙ URL ВНУТРИ FETCH
             const res = await fetch("https://api.jsonbin.io", {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': KEY },
@@ -66,9 +65,9 @@
                 st.innerText = "✅ База успешно создана!";
                 loadSched();
             } else {
-                st.innerText = "❌ Ошибка BIN: " + res.status;
+                st.innerText = "❌ Ошибка JSONbin: " + res.status;
             }
-        } catch (e) { st.innerText = "❌ Ошибка сети: " + e.message; }
+        } catch (e) { st.innerText = "❌ Ошибка: " + e.message; }
     }
 
     async function loadSched() {
