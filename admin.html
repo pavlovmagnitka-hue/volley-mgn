@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Volley MGN - CONTROL</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f7; padding: 20px; color: #333; }
+        .box { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; max-width: 800px; margin-left: auto; margin-right: auto; }
+        h2 { color: #007bff; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; margin-bottom: 15px; box-sizing: border-box; resize: vertical; }
+        button { padding: 12px 25px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+        .btn-live { background: #28a745; font-size: 13px; padding: 8px 15px; }
+        .btn-live:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background: #f8f9fa; color: #495057; }
+        tr:hover { background-color: #f1f4f9; }
+        .status { font-size: 14px; margin-top: 10px; color: #007bff; font-weight: bold; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>1. Жеребьевка турнира</h2>
+    <textarea id="tList" placeholder="Введите названия команд (каждая с новой строки)..."></textarea>
+    <button onclick="makeTours()">Создать расписание</button>
+    <div id="st" class="status"></div>
+</div>
+
+<div class="box">
+    <h2>2. Список матчей</h2>
+    <div id="sched">Загрузка расписания...</div>
+</div>
+
+<script>
+    // ИСПРАВЛЕНО: Базовый URL всегда должен заканчиваться на /
+    const DB_URL = "https://volleyscoremgn-default-rtdb.firebaseio.com";
+
+    async function makeTours() {
+        const area = document.getElementById('tList');
+        const status = document.getElementById('st');
+        
+        let teams = area.value.split('\n').map(t => t.trim()).filter(t => t !== "");
+        
+        if (teams.length < 2) { 
+            alert("Нужно минимум 2 команды!"); 
+            return; 
+        }
+
+        // Алгоритм Бергера (круговая система)
+        if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
+        
+        let schedule = [];
+        let n = teams.length;
+        let temp = [...teams];
+
+        for (let r = 0; r < n - 1; r++) {
+            for (let i = 0; i < n / 2; i++) {
+                let tA = temp[i];
+                let tB = temp[n - 1 - i];
+                if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") {
+                    schedule.push({ tour: r + 1, teamA: tA, teamB: tB });
+                }
+            }
+            temp.splice(1, 0, temp.pop());
+        }
+
+        status.innerText = "⏳ Сохранение в Firebase...";
+        
+        try {
+            // ИСПРАВЛЕНО: Добавлен .json и метод PUT для перезаписи
+            const response = await fetch(`${DB_URL}tournament.json`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    schedule: schedule,
+                    teams: teams,
+                    updatedAt: new Date().toISOString()
+                })
+            });
+            
+            if (response.ok) {
+                status.innerText = "✅ Расписание успешно обновлено!";
+                loadSched();
+            } else {
+                throw new Error("Ошибка сервера: " + response.status);
+            }
+        } catch (e) {
+            status.innerText = "❌ Ошибка сети: " + e.message;
+            console.error(e);
+        }
+    }
+
+    async function loadSched() {
+        const schedDiv = document.getElementById('sched');
+        try {
+            const res = await fetch(`${DB_URL}tournament.json`);
+            const data = await res.json();
+            
+            if (!data || !data.schedule) {
+                schedDiv.innerText = "Расписание пока пусто.";
+                return;
+            }
+
+            let html = '<table><tr><th>Тур</th><th>Матч</th><th>Действие</th></tr>';
+            data.schedule.forEach((m) => {
+                html += `<tr>
+                    <td>Тур ${m.tour}</td>
+                    <td><b>${m.teamA}</b> — <b>${m.teamB}</b></td>
+                    <td><button class="btn-live" onclick="setLive('${m.teamA}', '${m.teamB}')">В ЭФИР</button></td>
+                </tr>`;
+            });
+            schedDiv.innerHTML = html + '</table>';
+        } catch (e) { 
+            schedDiv.innerText = "Ошибка загрузки списка матчей.";
+        }
+    }
+
+    async function setLive(a, b) {
+        // Очищаем текущий счет для нового матча в эфире
+        const liveData = {
+            teamA: a,
+            teamB: b,
+            ptsA: 0,
+            ptsB: 0,
+            setsA: 0,
+            setsB: 0,
+            timeout: false,
+            sideSwap: false
+        };
+
+        try {
+            // ИСПРАВЛЕНО: Запись в live.json для оверлея
+            const res = await fetch(`${DB_URL}live.json`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(liveData)
+            });
+            
+            if (res.ok) {
+                alert(`Матч ${a} vs ${b} теперь отображается в OBS!`);
+            }
+        } catch (e) {
+            alert("Ошибка вывода в эфир: " + e.message);
+        }
+    }
+
+    // Загрузка данных при старте
+    window.onload = loadSched;
+</script>
+
+</body>
+</html>
