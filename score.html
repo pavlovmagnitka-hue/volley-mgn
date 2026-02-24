@@ -43,26 +43,26 @@
 </div>
 
 <script>
-    const BIN_ID = "699d793843b1c97be9992f8e";
-    const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
-    const URL = "https://api.jsonbin.io" + BIN_ID + "/latest?meta=false";
+    // ВСТАВЬ СВОЙ КЛЮЧ
+    const MY_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
+    const MY_URL = "https://api.jsonbin.io";
 
     async function sync() {
         try {
-            const res = await fetch(URL, { headers: { "X-Master-Key": API_KEY } });
+            const res = await fetch(MY_URL, { headers: { "X-Master-Key": MY_KEY } });
             const data = await res.json();
             const live = data.live;
             if (!live) return;
 
-            updateUI('pts1', live.ptsA);
-            updateUI('pts2', live.ptsB);
-            updateUI('sets1', live.setsA);
-            updateUI('sets2', live.setsB);
+            updateUI('pts1', live.ptsA || 0);
+            updateUI('pts2', live.ptsB || 0);
+            updateUI('sets1', live.setsA || 0);
+            updateUI('sets2', live.setsB || 0);
             
-            const nA = live.teamA.split('/');
+            const nA = String(live.teamA).split('/');
             document.getElementById('t1p1').innerText = nA[0] || "";
             document.getElementById('t1p2').innerText = nA[1] || "";
-            const nB = live.teamB.split('/');
+            const nB = String(live.teamB).split('/');
             document.getElementById('t2p1').innerText = nB[0] || "";
             document.getElementById('t2p2').innerText = nB[1] || "";
         } catch (e) { console.warn("Синхронизация..."); }
@@ -75,7 +75,7 @@
             el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
         }
     }
-    setInterval(sync, 2000);
+    setInterval(sync, 2500);
     sync();
 </script>
 </body>
