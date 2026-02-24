@@ -5,33 +5,31 @@ const BIN_URL = "https://api.jsonbin.io" + BIN_ID;
 
 async function mod(key, d) {
     try {
-        // 1. Получаем свежие данные (вместе с турнирной сеткой, чтобы не стереть её!)
-        const res = await fetch(BIN_URL + "/latest", {
+        // 1. Получаем ПОЛНЫЙ объект (с турниром и live)
+        const res = await fetch(BIN_URL + "/latest?meta=false", {
             headers: { "X-Master-Key": API_KEY }
         });
-        const data = await res.json();
-        let record = data.record;
+        let data = await res.json();
 
-        // 2. Меняем значение
-        record.live[key] = Math.max(0, (record.live[key] || 0) + d);
+        // 2. Модифицируем нужную цифру внутри блока live
+        data.live[key] = Math.max(0, (data.live[key] || 0) + d);
         
-        // Сброс очков при новом сете
         if (key.includes('sets') && d > 0) {
-            record.live.ptsA = 0; record.live.ptsB = 0;
+            data.live.ptsA = 0; data.live.ptsB = 0;
         }
 
-        // 3. Сохраняем обратно
+        // 3. Отправляем ВЕСЬ объект обратно
         await fetch(BIN_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Master-Key': API_KEY
             },
-            body: JSON.stringify(record)
+            body: JSON.stringify(data)
         });
         
-        render(record.live); // Обновляем экран пульта
-    } catch (e) { alert("Ошибка пульта: " + e.message); }
+        render(data.live); 
+    } catch (e) { console.error("Ошибка пульта"); }
 }
 
 function render(live) {
@@ -39,6 +37,6 @@ function render(live) {
     document.getElementById('pB').innerText = live.ptsB;
     document.getElementById('sA').innerText = live.setsA;
     document.getElementById('sB').innerText = live.setsB;
-    document.getElementById('nA').innerText = live.teamA;
-    document.getElementById('nB').innerText = live.teamB;
+    document.getElementById('nA').innerText = live.teamA.split('/')[0];
+    document.getElementById('nB').innerText = live.teamB.split('/')[0];
 }
