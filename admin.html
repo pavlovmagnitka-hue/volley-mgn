@@ -29,11 +29,12 @@
 </div>
 
 <script>
-    // === ВСТАВЬ СВОИ ДАННЫЕ ТУТ ===
-    const BIN_ID = "699d793843b1c97be9992f8e";
-    const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
-    const URL = `https://api.jsonbin.io{BIN_ID}`;
-
+  // Вставь сюда ID (только буквы и цифры, например: 67bc6689e41b4d3414995965)
+const BIN_ID = "699d793843b1c97be9992f8e"; 
+// Вставь сюда Master Key (длинный, начинается на $2b$10$)
+const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS""; 
+// ПРАВИЛЬНАЯ ССЫЛКА (с косой чертой перед ID)
+const URL = "https://api.jsonbin.io" + BIN_ID;
     async function makeTours() {
         const st = document.getElementById('st');
         const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t !== "");
@@ -115,3 +116,4 @@
 </script>
 </body>
 </html>
+
