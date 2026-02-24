@@ -2,110 +2,147 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Volley MGN - TOTAL FIX</title>
+    <title>Admin Volley MGN - Tournament Creator</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 600px; margin: auto; }
-        textarea { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; }
-        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
-        td, th { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .btn-live { background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; margin-bottom: 20px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-size: 16px; }
+        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        input[type="time"] { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-live { background: #28a745; font-size: 12px; padding: 5px 10px; }
         .status { margin-top: 10px; font-weight: bold; color: #007bff; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>1. Создать турнир</h2>
-    <textarea id="tList" placeholder="Команды (каждая с новой строки)"></textarea>
-    <button onclick="makeTours()">Инициализировать базу</button>
-    <div id="st" class="status">Готов</div>
+    <h2>1. Список команд</h2>
+    <p><small>Введите команды (каждая с новой строки):</small></p>
+    <textarea id="tList" placeholder="Команда 1&#10;Команда 2&#10;Команда 3"></textarea>
+    <button onclick="generateGrid()">Сгенерировать расписание</button>
+</div>
+
+<div class="box" id="gridBox" style="display:none;">
+    <h2>2. Настройка матчей</h2>
+    <div id="gridTable"></div>
+    <br>
+    <button onclick="saveAll()">✅ Сохранить турнир в облако</button>
+    <div id="st" class="status"></div>
 </div>
 
 <div class="box">
-    <h2>2. Расписание</h2>
-    <div id="sched">Загрузка списка...</div>
+    <h2>3. Текущее расписание (в базе)</h2>
+    <div id="dbList">Загрузка...</div>
 </div>
 
 <script>
-    // ВСТАВЬ СВОЙ MASTER KEY В КАВЫЧКИ НИЖЕ
-    const KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
+    // === ДАННЫЕ JSONBIN ===
+    const MASTER_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
+    const BIN_URL = "https://api.jsonbin.io";
 
-    async function makeTours() {
-        const st = document.getElementById('st');
-        const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t !== "");
-        if (teams.length < 2) return alert("Нужно минимум 2 команды!");
+    let currentGrid = [];
 
-        if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
-        let schedule = [];
-        let temp = [...teams];
-        for (let r = 0; r < temp.length - 1; r++) {
-            for (let i = 0; i < temp.length / 2; i++) {
-                let tA = temp[i], tB = temp[temp.length - 1 - i];
-                if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") schedule.push({ tour: r + 1, teamA: tA, teamB: tB });
+    // ГЕНЕРАЦИЯ СЕТКИ (Бергер)
+    function generateGrid() {
+        const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t);
+        if (teams.length < 2) return alert("Нужно минимум 2 команды");
+        
+        let t = [...teams];
+        if (t.length % 2 !== 0) t.push("ВЫХОДНОЙ");
+        
+        const n = t.length;
+        currentGrid = [];
+        
+        for (let r = 0; r < n - 1; r++) {
+            for (let i = 0; i < n / 2; i++) {
+                let tA = t[i], tB = t[n - 1 - i];
+                if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") {
+                    currentGrid.push({ tour: r + 1, teamA: tA, teamB: tB, time: "12:00" });
+                }
             }
-            temp.splice(1, 0, temp.pop());
+            t.splice(1, 0, t.pop());
         }
 
-        st.innerText = "⏳ Отправка в облако...";
+        renderGrid();
+        document.getElementById('gridBox').style.display = "block";
+    }
+
+    // ОТРИСОВКА СЕТКИ ДЛЯ РЕДАКТИРОВАНИЯ
+    function renderGrid() {
+        let h = '<table><tr><th>Тур</th><th>Матч</th><th>Время</th></tr>';
+        currentGrid.forEach((m, i) => {
+            h += `<tr>
+                <td>Тур ${m.tour}</td>
+                <td>${m.teamA} vs ${m.teamB}</td>
+                <td><input type="time" value="${m.time}" onchange="currentGrid[${i}].time = this.value"></td>
+            </tr>`;
+        });
+        document.getElementById('gridTable').innerHTML = h + '</table>';
+    }
+
+    // СОХРАНЕНИЕ ВСЕГО В БАЗУ
+    async function saveAll() {
+        const st = document.getElementById('st');
+        st.innerText = "⏳ Сохранение...";
         
-        const baseData = {
-            tournament: { schedule: schedule, updatedAt: Date.now() },
-            live: { teamA: "Команда А", teamB: "Команда Б", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false }
+        const payload = {
+            tournament: { schedule: currentGrid, updatedAt: Date.now() },
+            live: { teamA: "...", teamB: "...", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 }
         };
 
         try {
-            const res = await fetch("https://api.jsonbin.io", {
+            const res = await fetch(BIN_URL, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': KEY },
-                body: JSON.stringify(baseData)
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
-                st.innerText = "✅ База успешно создана!";
-                loadSched();
-            } else {
-                st.innerText = "❌ Ошибка JSONbin: " + res.status;
+                st.innerText = "✅ Турнир успешно сохранен!";
+                loadFromDB();
             }
         } catch (e) { st.innerText = "❌ Ошибка: " + e.message; }
     }
 
-    async function loadSched() {
+    // ЗАГРУЗКА ИЗ БАЗЫ
+    async function loadFromDB() {
         try {
-            const res = await fetch("https://api.jsonbin.io/latest?meta=false", { 
-                headers: { "X-Master-Key": KEY } 
-            });
+            const res = await fetch(BIN_URL + "/latest?meta=false", { headers: { "X-Master-Key": MASTER_KEY } });
             const data = await res.json();
-            if (!data.tournament) {
-                document.getElementById('sched').innerText = "База пуста. Нажмите кнопку выше.";
-                return;
-            }
-            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Эфир</th></tr>';
+            if (!data.tournament) return;
+
+            let h = '<table><tr><th>Тур</th><th>Время</th><th>Матч</th><th>Эфир</th></tr>';
             data.tournament.schedule.forEach(m => {
-                h += `<tr><td>${m.tour}</td><td>${m.teamA} - ${m.teamB}</td>
-                <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td></tr>`;
+                h += `<tr>
+                    <td>Тур ${m.tour}</td>
+                    <td>${m.time || '--:--'}</td>
+                    <td><b>${m.teamA}</b> - <b>${m.teamB}</b></td>
+                    <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td>
+                </tr>`;
             });
-            document.getElementById('sched').innerHTML = h + '</table>';
-        } catch (e) { document.getElementById('sched').innerText = "Ошибка загрузки списка."; }
+            document.getElementById('dbList').innerHTML = h + '</table>';
+        } catch (e) { document.getElementById('dbList').innerText = "Ошибка загрузки данных."; }
     }
 
+    // ВЫВОД МАТЧА В ЭФИР
     async function setLive(a, b) {
         try {
-            const res = await fetch("https://api.jsonbin.io/latest?meta=false", { 
-                headers: { "X-Master-Key": KEY } 
-            });
+            const res = await fetch(BIN_URL + "/latest?meta=false", { headers: { "X-Master-Key": MASTER_KEY } });
             let data = await res.json();
-            data.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false };
+            data.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 };
             
-            await fetch("https://api.jsonbin.io", {
+            await fetch(BIN_URL, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': KEY },
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
                 body: JSON.stringify(data)
             });
             alert("Матч " + a + " vs " + b + " запущен!");
         } catch (e) { alert("Ошибка: " + e.message); }
     }
-    loadSched();
+
+    loadFromDB();
 </script>
 </body>
 </html>
