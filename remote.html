@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote MGN - JSONbin</title>
+    <title>Remote MGN - JSONbin FIXED</title>
     <style>
         body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 10px; touch-action: manipulation; }
-        .info { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-bottom: 4px solid #fc0; font-weight: bold; }
+        .info { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-bottom: 4px solid #fc0; font-weight: bold; min-height: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .score { font-size: 80px; font-weight: 900; margin: 5px 0; }
         .sets { font-size: 24px; color: #fc0; background: #222; padding: 5px 15px; border-radius: 5px; display: inline-block; }
@@ -15,7 +15,9 @@
     </style>
 </head>
 <body>
-<div class="info"><span id="nA">Загрузка...</span> vs <span id="nB">...</span></div>
+
+<div class="info"><span id="nA">ЗАГРУЗКА...</span> vs <span id="nB">...</span></div>
+
 <div class="grid">
     <div>
         <div class="sets" id="sA">0</div>
@@ -35,43 +37,75 @@
 
 <script>
     // ВСТАВЬ СВОЙ КЛЮЧ
-    const MY_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
-    const MY_URL = "https://api.jsonbin.io";
+    const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS;
+    const BIN_ID = "699d793843b1c97be9992f8e";
+    const BASE_URL = "https://api.jsonbin.io" + BIN_ID;
 
     async function mod(key, d) {
         try {
-            // Получаем свежие данные
-            const res = await fetch(MY_URL + "/latest?meta=false", { headers: { "X-Master-Key": MY_KEY } });
-            let data = await res.json();
+            // 1. Получаем полные данные
+            const res = await fetch(BASE_URL + "/latest?meta=false", { 
+                headers: { "X-Master-Key": API_KEY } 
+            });
+            const data = await res.json();
             
-            // Модифицируем
+            if (!data || !data.live) {
+                console.error("Данные live не найдены в базе");
+                return;
+            }
+
+            // 2. Изменяем значение
             data.live[key] = Math.max(0, (data.live[key] || 0) + d);
-            if (key.includes('sets') && d > 0) { data.live.ptsA = 0; data.live.ptsB = 0; }
             
-            // Сохраняем
-            const saveRes = await fetch(MY_URL, {
+            // Сброс очков при новом сете
+            if (key.includes('sets') && d > 0) {
+                data.live.ptsA = 0;
+                data.live.ptsB = 0;
+            }
+
+            // 3. Сохраняем весь объект обратно
+            const saveRes = await fetch(BASE_URL, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MY_KEY },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-Master-Key': API_KEY 
+                },
                 body: JSON.stringify(data)
             });
-            
-            if(saveRes.ok) render(data.live);
-        } catch (e) { console.error("Ошибка пульта:", e); }
+
+            if (saveRes.ok) {
+                render(data.live);
+            }
+        } catch (e) {
+            console.error("Ошибка пульта:", e);
+            alert("Ошибка связи с базой!");
+        }
     }
 
     function render(live) {
-        if(!live) return;
-        document.getElementById('pA').innerText = live.ptsA;
-        document.getElementById('pB').innerText = live.ptsB;
-        document.getElementById('sA').innerText = live.setsA;
-        document.getElementById('sB').innerText = live.setsB;
-        document.getElementById('nA').innerText = live.teamA;
-        document.getElementById('nB').innerText = live.teamB;
+        if (!live) return;
+        document.getElementById('pA').innerText = live.ptsA || 0;
+        document.getElementById('pB').innerText = live.ptsB || 0;
+        document.getElementById('sA').innerText = live.setsA || 0;
+        document.getElementById('sB').innerText = live.setsB || 0;
+        document.getElementById('nA').innerText = live.teamA || "А";
+        document.getElementById('nB').innerText = live.teamB || "Б";
     }
 
-    // Первичная загрузка
-    fetch(MY_URL + "/latest?meta=false", { headers: { "X-Master-Key": MY_KEY } })
-        .then(r => r.json()).then(d => render(d.live));
+    // Первичная загрузка при открытии страницы
+    async function init() {
+        try {
+            const res = await fetch(BASE_URL + "/latest?meta=false", { 
+                headers: { "X-Master-Key": API_KEY } 
+            });
+            const data = await res.json();
+            if (data && data.live) render(data.live);
+        } catch (e) {
+            document.getElementById('nA').innerText = "ОШИБКА КЛЮЧА";
+        }
+    }
+
+    init();
 </script>
 </body>
 </html>
