@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Volley MGN - Scoreboard Final</title>
+    <title>Volley MGN - Scoreboard FIXED</title>
     <style>
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background: transparent; display: flex; justify-content: center; user-select: none; }
         .scoreboard { 
@@ -20,15 +20,7 @@
             cursor: text; outline: none; transition: 0.2s;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .team-name:focus { border-color: #ffcc00; background: rgba(255,255,255,0.15); }
-        .jersey-box { position: relative; flex-shrink: 0; }
         .jersey-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #666; cursor: pointer; }
-        .color-selector { 
-            position: absolute; top: 40px; left: 50%; transform: translateX(-50%); 
-            background: #222; border: 1px solid #444; border-radius: 8px; 
-            display: none; grid-template-columns: repeat(4, 1fr); padding: 5px; z-index: 1000; 
-        }
-        .color-btn { width: 25px; height: 25px; border-radius: 50%; margin: 4px; cursor: pointer; border: 1px solid #444; }
         .sets { background: #333; padding: 8px 18px; border-radius: 8px; font-size: 28px; font-weight: 800; color: #ffcc00; cursor: pointer; min-width: 35px; text-align: center; }
         .points { font-size: 68px; font-weight: 900; width: 110px; text-align: center; background: #eee; color: #111; margin: 0 15px; border-radius: 8px; cursor: pointer; }
         .pop { animation: popAnim 0.2s ease-out; }
@@ -42,12 +34,8 @@
     <div class="team" style="justify-content: flex-end; text-align: right;">
         <div class="names-container">
             <div class="team-name" id="t1p1" contenteditable="true">КОМАНДА А</div>
-            <div class="team-name" id="t1p2" contenteditable="true"></div>
         </div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view1" style="background:#fff" onclick="openColors(1)"></div>
-            <div id="sel1" class="color-selector"></div>
-        </div>
+        <div class="jersey-color" id="view1" style="background:#fff"></div>
         <div class="sets" id="sets1" onclick="changeV('setsA', 1)" oncontextmenu="changeV('setsA', -1); return false;">0</div>
     </div>
 
@@ -57,91 +45,68 @@
 
     <div class="team">
         <div class="sets" id="sets2" onclick="changeV('setsB', 1)" oncontextmenu="changeV('setsB', -1); return false;">0</div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view2" style="background:#04f" onclick="openColors(2)"></div>
-            <div id="sel2" class="color-selector"></div>
-        </div>
+        <div class="jersey-color" id="view2" style="background:#04f"></div>
         <div class="names-container" style="text-align: left;">
             <div class="team-name" id="t2p1" contenteditable="true">КОМАНДА Б</div>
-            <div class="team-name" id="t2p2" contenteditable="true"></div>
         </div>
     </div>
 </div>
 
 <script>
-    // ИСПРАВЛЕНО: Прямая ссылка на узел live.json
-    const DB_LIVE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
-    const palette = ["#fff", "#04f", "#f00", "#0a0", "#fc0", "#000", "#0cf", "#888"];
-    let localState = { teamA: "КОМАНДА А", teamB: "КОМАНДА Б", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, sideSwap: false, timeout: false };
+    // СТРОГО ПРОВЕРЬТЕ ЭТУ ССЫЛКУ. Она должна заканчиваться на .json
+    const URL_LIVE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
+    
+    let state = { ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, teamA: "А", teamB: "Б" };
 
+    // Функция получения данных
     async function sync() {
         try {
-            const res = await fetch(DB_LIVE);
-            const data = await res.json();
-            if (!data) return;
-
-            localState = data;
-
-            const up = (id, val) => {
-                const el = document.getElementById(id);
-                if (el && el.innerText != val) {
-                    el.innerText = val;
-                    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-                }
-            };
-
-            up('pts1', data.ptsA || 0);
-            up('pts2', data.ptsB || 0);
-            up('sets1', data.setsA || 0);
-            up('sets2', data.setsB || 0);
-            
-            if (!document.activeElement.classList.contains('team-name')) {
-                document.getElementById('t1p1').innerText = data.teamA || "КОМАНДА А";
-                document.getElementById('t2p1').innerText = data.teamB || "КОМАНДА Б";
+            const r = await fetch(URL_LIVE);
+            if (!r.ok) return;
+            const data = await r.json();
+            if (data) {
+                state = data;
+                updateDOM('pts1', state.ptsA);
+                updateDOM('pts2', state.ptsB);
+                updateDOM('sets1', state.setsA);
+                updateDOM('sets2', state.setsB);
+                if (document.activeElement.id !== 't1p1') document.getElementById('t1p1').innerText = state.teamA;
+                if (document.activeElement.id !== 't2p1') document.getElementById('t2p1').innerText = state.teamB;
             }
-        } catch (e) { console.error("Sync Error:", e); }
+        } catch (e) { console.error(" Ошибка загрузки:", e); }
     }
 
-    async function changeV(key, diff) {
-        localState[key] = Math.max(0, (localState[key] || 0) + diff);
-        if (key.includes('sets') && diff > 0) {
-            localState.ptsA = 0; localState.ptsB = 0;
+    // Функция обновления экрана с анимацией
+    function updateDOM(id, val) {
+        const el = document.getElementById(id);
+        if (el.innerText != val) {
+            el.innerText = val;
+            el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
         }
+    }
+
+    // Функция клика (изменение данных)
+    async function changeV(key, d) {
+        state[key] = Math.max(0, (state[key] || 0) + d);
+        if (key.includes('sets') && d > 0) { state.ptsA = 0; state.ptsB = 0; }
 
         try {
-            await fetch(DB_LIVE, {
+            // Мгновенно обновляем у себя, чтобы не ждать сеть
+            updateDOM(key === 'ptsA' ? 'pts1' : key === 'ptsB' ? 'pts2' : key === 'setsA' ? 'sets1' : 'sets2', state[key]);
+
+            await fetch(URL_LIVE, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localState)
+                body: JSON.stringify(state)
             });
-            sync();
-        } catch (e) { console.error("Update Error:", e); }
+        } catch (e) { alert("Ошибка сохранения! Проверьте интернет."); }
     }
 
-    function initColors(n) {
-        const sel = document.getElementById('sel' + n);
-        palette.forEach(c => {
-            const b = document.createElement('div');
-            b.className = 'color-btn'; b.style.background = c;
-            b.onclick = (e) => {
-                e.stopPropagation();
-                document.getElementById('view' + n).style.background = c;
-                sel.style.display = 'none';
-            };
-            sel.appendChild(b);
-        });
-    }
-    initColors(1); initColors(2);
-    function openColors(n) {
-        const s = document.getElementById('sel' + n);
-        s.style.display = (s.style.display === 'grid') ? 'none' : 'grid';
-    }
-
-    document.addEventListener('contextmenu', e => { 
-        if(e.target.classList.contains('points') || e.target.classList.contains('sets')) e.preventDefault(); 
+    // Блокировка меню правой кнопки
+    document.addEventListener('contextmenu', e => {
+        if (e.target.classList.contains('points') || e.target.classList.contains('sets')) e.preventDefault();
     });
 
-    setInterval(sync, 2000); 
+    setInterval(sync, 2000);
     sync();
 </script>
 </body>
