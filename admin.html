@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Volley MGN - Light</title>
+    <title>Admin Volley MGN - JSONbin Edition</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f7; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 600px; margin: auto; }
@@ -10,17 +10,17 @@
         button { padding: 12px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .btn-live { background: #28a745; padding: 5px 10px; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-live { background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
         .status { margin-top: 10px; font-weight: bold; color: #007bff; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>1. Жеребьевка турнира</h2>
+    <h2>1. Жеребьевка (JSONbin)</h2>
     <textarea id="tList" placeholder="Команды (каждая с новой строки)..."></textarea>
     <button onclick="makeTours()">Создать расписание</button>
-    <div id="st" class="status"></div>
+    <div id="st" class="status">Готов</div>
 </div>
 
 <div class="box">
@@ -29,16 +29,17 @@
 </div>
 
 <script>
-    // СТРОГО ПРОВЕРЬТЕ ЭТУ ССЫЛКУ - она должна заканчиваться на /
-    const DB_BASE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
+    // === ВСТАВЬ СВОИ ДАННЫЕ ТУТ ===
+    const BIN_ID = "699d793843b1c97be9992f8e";
+    const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
+    const URL = `https://api.jsonbin.io{BIN_ID}`;
 
     async function makeTours() {
         const st = document.getElementById('st');
         const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t !== "");
-        
-        if (teams.length < 2) { alert("Нужно 2+ команды"); return; }
+        if (teams.length < 2) return alert("Нужно 2+ команды");
+
         if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
-        
         let schedule = [];
         let temp = [...teams];
         for (let r = 0; r < temp.length - 1; r++) {
@@ -49,12 +50,22 @@
             temp.splice(1, 0, temp.pop());
         }
 
-        st.innerText = "⏳ Сохранение...";
+        st.innerText = "⏳ Сохранение в облако...";
+        
         try {
-            const res = await fetch(DB_BASE + "tournament.json", {
+            // Чтобы обновить бин, нужно сначала получить текущие данные или отправить новые
+            const res = await fetch(URL, {
                 method: 'PUT',
-                body: JSON.stringify({ schedule, updatedAt: Date.now() })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify({ 
+                    tournament: { schedule, updatedAt: Date.now() },
+                    live: { teamA: "...", teamB: "...", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 }
+                })
             });
+
             if (res.ok) {
                 st.innerText = "✅ Расписание сохранено!";
                 loadSched();
@@ -64,18 +75,16 @@
 
     async function loadSched() {
         try {
-            const res = await fetch(DB_BASE + "tournament.json");
-            const data = await res.json();
-            const schedDiv = document.getElementById('sched');
+            const res = await fetch(URL, { headers: { 'X-Master-Key': API_KEY } });
+            const result = await res.json();
+            const data = result.record; // В JSONbin данные лежат в поле record
             
-            if (!data || !data.schedule) {
-                schedDiv.innerText = "Расписание пусто.";
-                return;
-            }
+            const schedDiv = document.getElementById('sched');
+            if (!data.tournament.schedule) { schedDiv.innerText = "Пусто"; return; }
 
-            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Действие</th></tr>';
-            data.schedule.forEach(m => {
-                h += `<tr><td>${m.tour}</td><td>${m.teamA} vs ${m.teamB}</td>
+            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Эфир</th></tr>';
+            data.tournament.schedule.forEach(m => {
+                h += `<tr><td>${m.tour}</td><td>${m.teamA} - ${m.teamB}</td>
                 <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td></tr>`;
             });
             schedDiv.innerHTML = h + '</table>';
@@ -83,13 +92,22 @@
     }
 
     async function setLive(a, b) {
-        const data = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
         try {
-            const res = await fetch(DB_BASE + "live.json", {
+            // 1. Сначала читаем текущий бин, чтобы не стереть турнирную сетку
+            const getRes = await fetch(URL, { headers: { 'X-Master-Key': API_KEY } });
+            const current = await getRes.json();
+            const data = current.record;
+
+            // 2. Обновляем только блок live
+            data.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
+
+            // 3. Сохраняем всё обратно
+            await fetch(URL, {
                 method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
                 body: JSON.stringify(data)
             });
-            if (res.ok) alert("Матч запущен!");
+            alert("Матч запущен!");
         } catch (e) { alert("Ошибка: " + e.message); }
     }
 
