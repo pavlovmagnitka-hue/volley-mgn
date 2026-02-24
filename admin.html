@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Volley MGN - JSONbin Edition</title>
+    <title>Admin Volley MGN - JSONbin</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f7; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 600px; margin: auto; }
@@ -19,28 +19,29 @@
 <div class="box">
     <h2>1. Жеребьевка (JSONbin)</h2>
     <textarea id="tList" placeholder="Команды (каждая с новой строки)..."></textarea>
-    <button onclick="makeTours()">Создать расписание</button>
-    <div id="st" class="status">Готов</div>
+    <button id="btnSave" onclick="makeTours()">Создать расписание</button>
+    <div id="st" class="status">Готов к работе</div>
 </div>
 
 <div class="box">
     <h2>2. Список матчей</h2>
-    <div id="sched">Загрузка...</div>
+    <div id="sched">Загрузка данных...</div>
 </div>
 
 <script>
-  // Вставь сюда ID (только буквы и цифры, например: 67bc6689e41b4d3414995965)
-const BIN_ID = "699d793843b1c97be9992f8e"; 
-// Вставь сюда Master Key (длинный, начинается на $2b$10$)
-const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS""; 
-// ПРАВИЛЬНАЯ ССЫЛКА (с косой чертой перед ID)
-const URL = "https://api.jsonbin.io" + BIN_ID;
+    // === ВНИМАТЕЛЬНО ВСТАВЬ ДАННЫЕ МЕЖДУ КАВЫЧЕК ===
+  const BIN_ID = "699d793843b1c97be9992f8e"; // ТОЛЬКО ID (набор букв и цифр)
+   const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS";
+    const BIN_URL = "https://api.jsonbin.io" + BIN_ID;
+
+    // Функция генерации и сохранения
     async function makeTours() {
         const st = document.getElementById('st');
         const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t !== "");
-        if (teams.length < 2) return alert("Нужно 2+ команды");
-
+        
+        if (teams.length < 2) { alert("Нужно минимум 2 команды!"); return; }
         if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
+        
         let schedule = [];
         let temp = [...teams];
         for (let r = 0; r < temp.length - 1; r++) {
@@ -54,8 +55,7 @@ const URL = "https://api.jsonbin.io" + BIN_ID;
         st.innerText = "⏳ Сохранение в облако...";
         
         try {
-            // Чтобы обновить бин, нужно сначала получить текущие данные или отправить новые
-            const res = await fetch(URL, {
+            const res = await fetch(BIN_URL, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -70,50 +70,60 @@ const URL = "https://api.jsonbin.io" + BIN_ID;
             if (res.ok) {
                 st.innerText = "✅ Расписание сохранено!";
                 loadSched();
+            } else {
+                st.innerText = "❌ Ошибка BIN: " + res.status;
             }
-        } catch (e) { st.innerText = "❌ Ошибка: " + e.message; }
+        } catch (e) { 
+            st.innerText = "❌ Ошибка сети: " + e.message; 
+        }
     }
 
+    // Функция загрузки списка
     async function loadSched() {
+        const schedDiv = document.getElementById('sched');
         try {
-            const res = await fetch(URL, { headers: { 'X-Master-Key': API_KEY } });
-            const result = await res.json();
-            const data = result.record; // В JSONbin данные лежат в поле record
+            const res = await fetch(BIN_URL, {
+                headers: { 'X-Master-Key': API_KEY }
+            });
+            const data = await res.json();
+            const record = data.record;
             
-            const schedDiv = document.getElementById('sched');
-            if (!data.tournament.schedule) { schedDiv.innerText = "Пусто"; return; }
+            if (!record.tournament || !record.tournament.schedule) {
+                schedDiv.innerText = "Расписание пока пусто.";
+                return;
+            }
 
             let h = '<table><tr><th>Тур</th><th>Матч</th><th>Эфир</th></tr>';
-            data.tournament.schedule.forEach(m => {
+            record.tournament.schedule.forEach(m => {
                 h += `<tr><td>${m.tour}</td><td>${m.teamA} - ${m.teamB}</td>
                 <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td></tr>`;
             });
             schedDiv.innerHTML = h + '</table>';
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            schedDiv.innerText = "Ошибка загрузки списка.";
+        }
     }
 
+    // Функция вывода матча в эфир
     async function setLive(a, b) {
         try {
-            // 1. Сначала читаем текущий бин, чтобы не стереть турнирную сетку
-            const getRes = await fetch(URL, { headers: { 'X-Master-Key': API_KEY } });
-            const current = await getRes.json();
-            const data = current.record;
+            const res = await fetch(BIN_URL, { headers: { 'X-Master-Key': API_KEY } });
+            const current = await res.json();
+            const record = current.record;
 
-            // 2. Обновляем только блок live
-            data.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
+            record.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
 
-            // 3. Сохраняем всё обратно
-            await fetch(URL, {
+            await fetch(BIN_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-                body: JSON.stringify(data)
+                body: JSON.stringify(record)
             });
-            alert("Матч запущен!");
+            alert("Матч запущен на табло!");
         } catch (e) { alert("Ошибка: " + e.message); }
     }
 
+    // Запуск при открытии
     loadSched();
 </script>
 </body>
 </html>
-
