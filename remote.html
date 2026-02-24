@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote MGN - JSONbin FIXED</title>
+    <title>Remote Volley MGN</title>
     <style>
         body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 10px; touch-action: manipulation; }
         .info { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-bottom: 4px solid #fc0; font-weight: bold; min-height: 20px; }
@@ -36,39 +36,32 @@
 </div>
 
 <script>
-    // ВСТАВЬ СВОЙ КЛЮЧ
-    const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS;
-    const BIN_ID = "699d793843b1c97be9992f8e";
-    const BASE_URL = "https://api.jsonbin.io" + BIN_ID;
+    // ВСТАВЬ СЮДА СВОИ ДАННЫЕ В КАВЫЧКИ
+    const MY_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
+    const BIN_URL = "https://api.jsonbin.io";
 
+    // Функция обновления данных
     async function mod(key, d) {
         try {
-            // 1. Получаем полные данные
-            const res = await fetch(BASE_URL + "/latest?meta=false", { 
-                headers: { "X-Master-Key": API_KEY } 
+            const res = await fetch(BIN_URL + "/latest?meta=false", { 
+                headers: { "X-Master-Key": MY_KEY } 
             });
             const data = await res.json();
             
-            if (!data || !data.live) {
-                console.error("Данные live не найдены в базе");
-                return;
-            }
-
-            // 2. Изменяем значение
+            // Меняем цифру
             data.live[key] = Math.max(0, (data.live[key] || 0) + d);
             
-            // Сброс очков при новом сете
+            // Если добавили сет, обнуляем очки
             if (key.includes('sets') && d > 0) {
                 data.live.ptsA = 0;
                 data.live.ptsB = 0;
             }
 
-            // 3. Сохраняем весь объект обратно
-            const saveRes = await fetch(BASE_URL, {
+            const saveRes = await fetch(BIN_URL, {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json', 
-                    'X-Master-Key': API_KEY 
+                    'X-Master-Key': MY_KEY 
                 },
                 body: JSON.stringify(data)
             });
@@ -78,10 +71,10 @@
             }
         } catch (e) {
             console.error("Ошибка пульта:", e);
-            alert("Ошибка связи с базой!");
         }
     }
 
+    // Отрисовка на экране
     function render(live) {
         if (!live) return;
         document.getElementById('pA').innerText = live.ptsA || 0;
@@ -92,20 +85,11 @@
         document.getElementById('nB').innerText = live.teamB || "Б";
     }
 
-    // Первичная загрузка при открытии страницы
-    async function init() {
-        try {
-            const res = await fetch(BASE_URL + "/latest?meta=false", { 
-                headers: { "X-Master-Key": API_KEY } 
-            });
-            const data = await res.json();
-            if (data && data.live) render(data.live);
-        } catch (e) {
-            document.getElementById('nA').innerText = "ОШИБКА КЛЮЧА";
-        }
-    }
-
-    init();
+    // Запуск при старте
+    fetch(BIN_URL + "/latest?meta=false", { headers: { "X-Master-Key": MY_KEY } })
+        .then(r => r.json())
+        .then(data => { if(data.live) render(data.live); })
+        .catch(e => console.error("Ошибка загрузки:", e));
 </script>
 </body>
 </html>
