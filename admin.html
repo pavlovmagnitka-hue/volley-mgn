@@ -2,16 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Volley MGN - Tournament Creator</title>
+    <title>Admin Volley MGN - FIXED</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
         .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; margin-bottom: 20px; }
-        textarea { width: 100%; height: 100px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-size: 16px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-size: 16px; box-sizing: border-box; }
         button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; }
-        button:hover { background: #0056b3; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        input[type="time"] { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
         .btn-live { background: #28a745; font-size: 12px; padding: 5px 10px; }
         .status { margin-top: 10px; font-weight: bold; color: #007bff; }
     </style>
@@ -20,128 +18,98 @@
 
 <div class="box">
     <h2>1. Список команд</h2>
-    <p><small>Введите команды (каждая с новой строки):</small></p>
-    <textarea id="tList" placeholder="Команда 1&#10;Команда 2&#10;Команда 3"></textarea>
+    <textarea id="tList" placeholder="Команда 1&#10;Команда 2"></textarea>
     <button onclick="generateGrid()">Сгенерировать расписание</button>
 </div>
 
 <div class="box" id="gridBox" style="display:none;">
-    <h2>2. Настройка матчей</h2>
-    <div id="gridTable"></div>
-    <br>
+    <h2>2. Новое расписание</h2>
+    <div id="gridTable"></div><br>
     <button onclick="saveAll()">✅ Сохранить турнир в облако</button>
     <div id="st" class="status"></div>
 </div>
 
 <div class="box">
-    <h2>3. Текущее расписание (в базе)</h2>
-    <div id="dbList">Загрузка...</div>
+    <h2>3. Текущие матчи в базе</h2>
+    <div id="dbList">Загрузка данных...</div>
 </div>
 
 <script>
-    // === ДАННЫЕ JSONBIN ===
-    const MASTER_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
-    const BIN_URL = "https://api.jsonbin.io";
-
+    // ВСТАВЬ СВОЙ MASTER KEY СЮДА
+    const KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
+    
     let currentGrid = [];
 
-    // ГЕНЕРАЦИЯ СЕТКИ (Бергер)
     function generateGrid() {
         const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t);
         if (teams.length < 2) return alert("Нужно минимум 2 команды");
-        
         let t = [...teams];
         if (t.length % 2 !== 0) t.push("ВЫХОДНОЙ");
-        
         const n = t.length;
         currentGrid = [];
-        
         for (let r = 0; r < n - 1; r++) {
             for (let i = 0; i < n / 2; i++) {
                 let tA = t[i], tB = t[n - 1 - i];
                 if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") {
-                    currentGrid.push({ tour: r + 1, teamA: tA, teamB: tB, time: "12:00" });
+                    currentGrid.push({ tour: r + 1, teamA: tA, teamB: tB });
                 }
             }
             t.splice(1, 0, t.pop());
         }
-
-        renderGrid();
+        let h = '<table><tr><th>Тур</th><th>Матч</th></tr>';
+        currentGrid.forEach(m => { h += `<tr><td>Тур ${m.tour}</td><td>${m.teamA} vs ${m.teamB}</td></tr>`; });
+        document.getElementById('gridTable').innerHTML = h + '</table>';
         document.getElementById('gridBox').style.display = "block";
     }
 
-    // ОТРИСОВКА СЕТКИ ДЛЯ РЕДАКТИРОВАНИЯ
-    function renderGrid() {
-        let h = '<table><tr><th>Тур</th><th>Матч</th><th>Время</th></tr>';
-        currentGrid.forEach((m, i) => {
-            h += `<tr>
-                <td>Тур ${m.tour}</td>
-                <td>${m.teamA} vs ${m.teamB}</td>
-                <td><input type="time" value="${m.time}" onchange="currentGrid[${i}].time = this.value"></td>
-            </tr>`;
-        });
-        document.getElementById('gridTable').innerHTML = h + '</table>';
-    }
-
-    // СОХРАНЕНИЕ ВСЕГО В БАЗУ
     async function saveAll() {
-        const st = document.getElementById('st');
-        st.innerText = "⏳ Сохранение...";
-        
+        document.getElementById('st').innerText = "⏳ Сохранение...";
         const payload = {
             tournament: { schedule: currentGrid, updatedAt: Date.now() },
             live: { teamA: "...", teamB: "...", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 }
         };
-
         try {
-            const res = await fetch(BIN_URL, {
+            const res = await fetch("https://api.jsonbin.io", {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': KEY },
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
-                st.innerText = "✅ Турнир успешно сохранен!";
+                document.getElementById('st').innerText = "✅ Турнир сохранен!";
                 loadFromDB();
-            }
-        } catch (e) { st.innerText = "❌ Ошибка: " + e.message; }
+            } else { document.getElementById('st').innerText = " Ошибка: " + res.status; }
+        } catch (e) { document.getElementById('st').innerText = " Ошибка сети"; }
     }
 
-    // ЗАГРУЗКА ИЗ БАЗЫ
     async function loadFromDB() {
         try {
-            const res = await fetch(BIN_URL + "/latest?meta=false", { headers: { "X-Master-Key": MASTER_KEY } });
+            const res = await fetch("https://api.jsonbin.io/latest?meta=false", { 
+                headers: { "X-Master-Key": KEY } 
+            });
             const data = await res.json();
-            if (!data.tournament) return;
-
-            let h = '<table><tr><th>Тур</th><th>Время</th><th>Матч</th><th>Эфир</th></tr>';
+            if (!data.tournament) { document.getElementById('dbList').innerText = "База пуста"; return; }
+            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Эфир</th></tr>';
             data.tournament.schedule.forEach(m => {
-                h += `<tr>
-                    <td>Тур ${m.tour}</td>
-                    <td>${m.time || '--:--'}</td>
-                    <td><b>${m.teamA}</b> - <b>${m.teamB}</b></td>
-                    <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td>
-                </tr>`;
+                h += `<tr><td>Тур ${m.tour}</td><td>${m.teamA} - ${m.teamB}</td>
+                <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td></tr>`;
             });
             document.getElementById('dbList').innerHTML = h + '</table>';
-        } catch (e) { document.getElementById('dbList').innerText = "Ошибка загрузки данных."; }
+        } catch (e) { document.getElementById('dbList').innerText = "Ошибка загрузки"; }
     }
 
-    // ВЫВОД МАТЧА В ЭФИР
     async function setLive(a, b) {
         try {
-            const res = await fetch(BIN_URL + "/latest?meta=false", { headers: { "X-Master-Key": MASTER_KEY } });
+            const res = await fetch("https://api.jsonbin.io/latest?meta=false", { headers: { "X-Master-Key": KEY } });
             let data = await res.json();
             data.live = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 };
-            
-            await fetch(BIN_URL, {
+            await fetch("https://api.jsonbin.io", {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': KEY },
                 body: JSON.stringify(data)
             });
-            alert("Матч " + a + " vs " + b + " запущен!");
-        } catch (e) { alert("Ошибка: " + e.message); }
+            alert("Матч " + a + " vs " + b + " в эфире!");
+        } catch (e) { alert("Ошибка"); }
     }
-
     loadFromDB();
 </script>
 </body>
