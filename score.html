@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Volley MGN - Интерактивное Табло</title>
+    <title>Volley MGN - Scoreboard Final</title>
     <style>
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background: transparent; display: flex; justify-content: center; user-select: none; }
         .scoreboard { 
@@ -41,8 +41,8 @@
 <div class="scoreboard">
     <div class="team" style="justify-content: flex-end; text-align: right;">
         <div class="names-container">
-            <div class="team-name" id="t1p1" contenteditable="true">ИГРОК 1</div>
-            <div class="team-name" id="t1p2" contenteditable="true">ИГРОК 2</div>
+            <div class="team-name" id="t1p1" contenteditable="true">КОМАНДА А</div>
+            <div class="team-name" id="t1p2" contenteditable="true"></div>
         </div>
         <div class="jersey-box">
             <div class="jersey-color" id="view1" style="background:#fff" onclick="openColors(1)"></div>
@@ -62,25 +62,25 @@
             <div id="sel2" class="color-selector"></div>
         </div>
         <div class="names-container" style="text-align: left;">
-            <div class="team-name" id="t2p1" contenteditable="true">ИГРОК 3</div>
-            <div class="team-name" id="t2p2" contenteditable="true">ИГРОК 4</div>
+            <div class="team-name" id="t2p1" contenteditable="true">КОМАНДА Б</div>
+            <div class="team-name" id="t2p2" contenteditable="true"></div>
         </div>
     </div>
 </div>
 
 <script>
-    const DB_URL = "https://volleyscoremgn-default-rtdb.firebaseio.com";
+    // ИСПРАВЛЕНО: Прямая ссылка на узел live.json
+    const DB_LIVE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
     const palette = ["#fff", "#04f", "#f00", "#0a0", "#fc0", "#000", "#0cf", "#888"];
-    let localState = { ptsA: 0, ptsB: 0, setsA: 0, setsB: 0 };
+    let localState = { teamA: "КОМАНДА А", teamB: "КОМАНДА Б", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, sideSwap: false, timeout: false };
 
-    // 1. СИНХРОНИЗАЦИЯ С БАЗОЙ
     async function sync() {
         try {
-            const res = await fetch(DB_URL);
+            const res = await fetch(DB_LIVE);
             const data = await res.json();
             if (!data) return;
 
-            localState = data; // Сохраняем состояние локально
+            localState = data;
 
             const up = (id, val) => {
                 const el = document.getElementById(id);
@@ -90,35 +90,34 @@
                 }
             };
 
-            up('pts1', data.ptsA); up('pts2', data.ptsB);
-            up('sets1', data.setsA); up('sets2', data.setsB);
+            up('pts1', data.ptsA || 0);
+            up('pts2', data.ptsB || 0);
+            up('sets1', data.setsA || 0);
+            up('sets2', data.setsB || 0);
             
-            // Имена обновляем только если нет фокуса (чтобы не мешать печатать)
             if (!document.activeElement.classList.contains('team-name')) {
-                document.getElementById('t1p1').innerText = data.teamA || "Команда А";
-                document.getElementById('t2p1').innerText = data.teamB || "Команда Б";
+                document.getElementById('t1p1').innerText = data.teamA || "КОМАНДА А";
+                document.getElementById('t2p1').innerText = data.teamB || "КОМАНДА Б";
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Sync Error:", e); }
     }
 
-    // 2. ИЗМЕНЕНИЕ ЗНАЧЕНИЙ (КЛИКИ)
     async function changeV(key, diff) {
         localState[key] = Math.max(0, (localState[key] || 0) + diff);
-        
-        // Авто-сброс очков при смене сета
         if (key.includes('sets') && diff > 0) {
             localState.ptsA = 0; localState.ptsB = 0;
         }
 
-        // Отправляем в базу
-        await fetch(DB_URL, {
-            method: 'PUT',
-            body: JSON.stringify(localState)
-        });
-        sync(); // Сразу обновляем экран
+        try {
+            await fetch(DB_LIVE, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localState)
+            });
+            sync();
+        } catch (e) { console.error("Update Error:", e); }
     }
 
-    // 3. ЦВЕТА ФОРМЫ (ЛОКАЛЬНО)
     function initColors(n) {
         const sel = document.getElementById('sel' + n);
         palette.forEach(c => {
@@ -138,9 +137,11 @@
         s.style.display = (s.style.display === 'grid') ? 'none' : 'grid';
     }
 
-    // Вспомогательные настройки
-    document.addEventListener('contextmenu', e => { if(e.target.classList.contains('points') || e.target.classList.contains('sets')) e.preventDefault(); });
-    setInterval(sync, 1500); 
+    document.addEventListener('contextmenu', e => { 
+        if(e.target.classList.contains('points') || e.target.classList.contains('sets')) e.preventDefault(); 
+    });
+
+    setInterval(sync, 2000); 
     sync();
 </script>
 </body>
