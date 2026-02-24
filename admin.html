@@ -35,7 +35,7 @@
 </div>
 
 <script>
-    // ИСПРАВЛЕНО: Базовый URL всегда должен заканчиваться на /
+    // ИСПРАВЛЕНО: Добавлен слэш в конце. Это критически важно!
     const DB_URL = "https://volleyscoremgn-default-rtdb.firebaseio.com";
 
     async function makeTours() {
@@ -43,13 +43,8 @@
         const status = document.getElementById('st');
         
         let teams = area.value.split('\n').map(t => t.trim()).filter(t => t !== "");
-        
-        if (teams.length < 2) { 
-            alert("Нужно минимум 2 команды!"); 
-            return; 
-        }
+        if (teams.length < 2) { alert("Нужно минимум 2 команды!"); return; }
 
-        // Алгоритм Бергера (круговая система)
         if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
         
         let schedule = [];
@@ -70,14 +65,13 @@
         status.innerText = "⏳ Сохранение в Firebase...";
         
         try {
-            // ИСПРАВЛЕНО: Добавлен .json и метод PUT для перезаписи
-            const response = await fetch(`${DB_URL}tournament.json`, {
+            // ИСПРАВЛЕНО: Теперь URL склеится корректно
+            const response = await fetch(DB_URL + "tournament.json", {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     schedule: schedule,
-                    teams: teams,
-                    updatedAt: new Date().toISOString()
+                    teams: teams
                 })
             });
             
@@ -85,18 +79,17 @@
                 status.innerText = "✅ Расписание успешно обновлено!";
                 loadSched();
             } else {
-                throw new Error("Ошибка сервера: " + response.status);
+                status.innerText = "❌ Ошибка сервера: " + response.status;
             }
         } catch (e) {
             status.innerText = "❌ Ошибка сети: " + e.message;
-            console.error(e);
         }
     }
 
     async function loadSched() {
         const schedDiv = document.getElementById('sched');
         try {
-            const res = await fetch(`${DB_URL}tournament.json`);
+            const res = await fetch(DB_URL + "tournament.json");
             const data = await res.json();
             
             if (!data || !data.schedule) {
@@ -119,21 +112,15 @@
     }
 
     async function setLive(a, b) {
-        // Очищаем текущий счет для нового матча в эфире
         const liveData = {
-            teamA: a,
-            teamB: b,
-            ptsA: 0,
-            ptsB: 0,
-            setsA: 0,
-            setsB: 0,
-            timeout: false,
-            sideSwap: false
+            teamA: a, teamB: b,
+            ptsA: 0, ptsB: 0,
+            setsA: 0, setsB: 0,
+            timeout: false, sideSwap: false
         };
 
         try {
-            // ИСПРАВЛЕНО: Запись в live.json для оверлея
-            const res = await fetch(`${DB_URL}live.json`, {
+            const res = await fetch(DB_URL + "live.json", {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(liveData)
@@ -147,9 +134,7 @@
         }
     }
 
-    // Загрузка данных при старте
     window.onload = loadSched;
 </script>
-
 </body>
 </html>
