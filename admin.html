@@ -2,19 +2,15 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Volley MGN - FIXED FINAL</title>
-    <!-- 1. Сначала загружаем библиотеки -->
-    <script src="https://www.gstatic.com"></script>
-    <script src="https://www.gstatic.com"></script>
+    <title>Admin Volley MGN - Light</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f7; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 600px; margin: auto; }
-        textarea { width: 100%; height: 100px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; box-sizing: border-box; }
         button { padding: 12px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #f4f4f4; }
-        .btn-live { background: #28a745; padding: 5px 10px; font-size: 12px; }
+        .btn-live { background: #28a745; padding: 5px 10px; color: white; border: none; border-radius: 3px; cursor: pointer; }
         .status { margin-top: 10px; font-weight: bold; color: #007bff; }
     </style>
 </head>
@@ -22,107 +18,82 @@
 
 <div class="box">
     <h2>1. Жеребьевка турнира</h2>
-    <textarea id="tList" placeholder="Введите команды (каждая с новой строки)..."></textarea>
-    <button onclick="makeTours()">Создать и сохранить расписание</button>
+    <textarea id="tList" placeholder="Команды (каждая с новой строки)..."></textarea>
+    <button onclick="makeTours()">Создать расписание</button>
     <div id="st" class="status"></div>
 </div>
 
 <div class="box">
-    <h2>2. Текущее расписание</h2>
-    <div id="sched">Загрузка данных из базы...</div>
+    <h2>2. Список матчей</h2>
+    <div id="sched">Загрузка...</div>
 </div>
 
 <script>
-    // 2. Ждем полной загрузки окна и скриптов
-    window.onload = function() {
-        if (typeof firebase === 'undefined') {
-            document.getElementById('st').innerText = "❌ Ошибка: Библиотеки Firebase не загружены. Проверьте интернет или VPN.";
-            return;
-        }
-
-        const firebaseConfig = {
-            databaseURL: "https://volleyscoremgn-default-rtdb.firebaseio.com"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        window.db = firebase.database(); // Делаем db глобальной
-        console.log("Firebase инициализирован");
-        loadSched();
-    };
+    // СТРОГО ПРОВЕРЬТЕ ЭТУ ССЫЛКУ - она должна заканчиваться на /
+    const DB_BASE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
 
     async function makeTours() {
         const st = document.getElementById('st');
-        const area = document.getElementById('tList');
+        const teams = document.getElementById('tList').value.split('\n').map(t => t.trim()).filter(t => t !== "");
         
-        if (!window.db) { alert("База еще не готова!"); return; }
-
-        let teams = area.value.split('\n').map(t => t.trim()).filter(t => t !== "");
-        if (teams.length < 2) { alert("Нужно минимум 2 команды!"); return; }
-
+        if (teams.length < 2) { alert("Нужно 2+ команды"); return; }
         if (teams.length % 2 !== 0) teams.push("ВЫХОДНОЙ");
         
         let schedule = [];
-        let n = teams.length;
         let temp = [...teams];
-
-        for (let r = 0; r < n - 1; r++) {
-            for (let i = 0; i < n / 2; i++) {
-                let tA = temp[i];
-                let tB = temp[n - 1 - i];
-                if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") {
-                    schedule.push({ tour: r + 1, teamA: tA, teamB: tB });
-                }
+        for (let r = 0; r < temp.length - 1; r++) {
+            for (let i = 0; i < temp.length / 2; i++) {
+                let tA = temp[i], tB = temp[temp.length - 1 - i];
+                if (tA !== "ВЫХОДНОЙ" && tB !== "ВЫХОДНОЙ") schedule.push({ tour: r + 1, teamA: tA, teamB: tB });
             }
             temp.splice(1, 0, temp.pop());
         }
 
-        st.innerText = "⏳ Сохранение в базу...";
-        
-        window.db.ref('tournament').set({
-            schedule: schedule,
-            updatedAt: Date.now()
-        })
-        .then(() => {
-            st.innerText = "✅ Расписание успешно обновлено!";
-            // loadSched вызовется автоматически через слушатель .on
-        })
-        .catch(e => {
-            st.innerText = "❌ Ошибка записи: " + e.message;
-        });
+        st.innerText = "⏳ Сохранение...";
+        try {
+            const res = await fetch(DB_BASE + "tournament.json", {
+                method: 'PUT',
+                body: JSON.stringify({ schedule, updatedAt: Date.now() })
+            });
+            if (res.ok) {
+                st.innerText = "✅ Расписание сохранено!";
+                loadSched();
+            }
+        } catch (e) { st.innerText = "❌ Ошибка: " + e.message; }
     }
 
-    function loadSched() {
-        const schedDiv = document.getElementById('sched');
-        // Используем .on для автоматического обновления списка при любых изменениях
-        window.db.ref('tournament/schedule').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (!data) {
-                schedDiv.innerText = "В базе пока нет расписания.";
+    async function loadSched() {
+        try {
+            const res = await fetch(DB_BASE + "tournament.json");
+            const data = await res.json();
+            const schedDiv = document.getElementById('sched');
+            
+            if (!data || !data.schedule) {
+                schedDiv.innerText = "Расписание пусто.";
                 return;
             }
 
-            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Управление</th></tr>';
-            data.forEach((m) => {
-                h += `<tr>
-                    <td>Тур ${m.tour}</td>
-                    <td><b>${m.teamA}</b> vs <b>${m.teamB}</b></td>
-                    <td><button class="btn-live" onclick="setLive('${m.teamA}', '${m.teamB}')">В ЭФИР</button></td>
-                </tr>`;
+            let h = '<table><tr><th>Тур</th><th>Матч</th><th>Действие</th></tr>';
+            data.schedule.forEach(m => {
+                h += `<tr><td>${m.tour}</td><td>${m.teamA} vs ${m.teamB}</td>
+                <td><button class="btn-live" onclick="setLive('${m.teamA}','${m.teamB}')">В ЭФИР</button></td></tr>`;
             });
             schedDiv.innerHTML = h + '</table>';
-        });
+        } catch (e) { console.error(e); }
     }
 
-    function setLive(a, b) {
-        window.db.ref('live').set({
-            teamA: a, teamB: b,
-            ptsA: 0, ptsB: 0,
-            setsA: 0, setsB: 0,
-            timeout: false, sideSwap: false
-        })
-        .then(() => alert("Матч " + a + " vs " + b + " выведен на табло!"))
-        .catch(e => alert("Ошибка: " + e.message));
+    async function setLive(a, b) {
+        const data = { teamA: a, teamB: b, ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
+        try {
+            const res = await fetch(DB_BASE + "live.json", {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            if (res.ok) alert("Матч запущен!");
+        } catch (e) { alert("Ошибка: " + e.message); }
     }
+
+    loadSched();
 </script>
 </body>
 </html>
