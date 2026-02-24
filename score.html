@@ -1,153 +1,39 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Volley MGN - Final Stable</title>
-    <style>
-        body { margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background: transparent; display: flex; justify-content: center; user-select: none; }
-        .scoreboard { 
-            display: flex; align-items: center; background: rgba(30, 30, 30, 0.98); 
-            border-bottom: 4px solid #ffcc00; color: white; padding: 10px 30px; 
-            border-radius: 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); 
-            min-width: 900px; min-height: 110px; 
-        }
-        .team { display: flex; align-items: center; flex: 1; gap: 15px; }
-        .names-container { display: flex; flex-direction: column; width: 100%; max-width: 350px; line-height: 1.2; }
-        .team-name { 
-            font-size: 20px; font-weight: 800; text-transform: uppercase; 
-            color: white; background: rgba(255,255,255,0.05); 
-            border: 1px dashed transparent; padding: 2px 8px; 
-            cursor: text; outline: none; transition: 0.2s;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .jersey-box { position: relative; flex-shrink: 0; }
-        .jersey-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #666; cursor: pointer; }
-        .color-selector { 
-            position: absolute; top: 40px; left: 50%; transform: translateX(-50%); 
-            background: #222; border: 1px solid #444; border-radius: 8px; 
-            display: none; grid-template-columns: repeat(4, 1fr); padding: 5px; z-index: 1000; 
-        }
-        .color-btn { width: 25px; height: 25px; border-radius: 50%; margin: 4px; cursor: pointer; border: 1px solid #444; }
-        .sets { background: #333; padding: 8px 18px; border-radius: 8px; font-size: 28px; font-weight: 800; color: #ffcc00; cursor: pointer; min-width: 35px; text-align: center; }
-        .points { font-size: 68px; font-weight: 900; width: 110px; text-align: center; background: #eee; color: #111; margin: 0 15px; border-radius: 8px; cursor: pointer; }
-        .pop { animation: popAnim 0.2s ease-out; }
-        @keyframes popAnim { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .divider { font-size: 40px; font-weight: bold; color: #444; }
-    </style>
-</head>
-<body>
+// === ВСТАВЬ СВОИ ДАННЫЕ ===
+const BIN_ID = "699d793843b1c97be9992f8e";
+const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
+const BIN_URL = "https://api.jsonbin.io" + BIN_ID + "/latest";
 
-<div class="scoreboard">
-    <div class="team" style="justify-content: flex-end; text-align: right;">
-        <div class="names-container">
-            <div class="team-name" id="t1p1" contenteditable="true">ИГРОК 1</div>
-            <div class="team-name" id="t1p2" contenteditable="true">ИГРОК 2</div>
-        </div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view1" style="background:#fff" onclick="toggleColors(1)"></div>
-            <div id="sel1" class="color-selector"></div>
-        </div>
-        <div class="sets" id="sets1" onclick="changeV('setsA', 1)" oncontextmenu="changeV('setsA', -1); return false;">0</div>
-    </div>
-
-    <div class="points" id="pts1" onclick="changeV('ptsA', 1)" oncontextmenu="changeV('ptsA', -1); return false;">0</div>
-    <div class="divider">:</div>
-    <div class="points" id="pts2" onclick="changeV('ptsB', 1)" oncontextmenu="changeV('ptsB', -1); return false;">0</div>
-
-    <div class="team">
-        <div class="sets" id="sets2" onclick="changeV('setsB', 1)" oncontextmenu="changeV('setsB', -1); return false;">0</div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view2" style="background:#04f" onclick="toggleColors(2)"></div>
-            <div id="sel2" class="color-selector"></div>
-        </div>
-        <div class="names-container" style="text-align: left;">
-            <div class="team-name" id="t2p1" contenteditable="true">ИГРОК 3</div>
-            <div class="team-name" id="t2p2" contenteditable="true">ИГРОК 4</div>
-        </div>
-    </div>
-</div>
-
-<script>
-    const URL_LIVE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
-    const palette = ["#fff", "#04f", "#f00", "#0a0", "#fc0", "#000", "#0cf", "#888"];
-    let state = { ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, teamA: "КОМАНДА А", teamB: "КОМАНДА Б" };
-
-    // Инициализация палитры
-    function initPalette(n) {
-        const sel = document.getElementById('sel' + n);
-        palette.forEach(c => {
-            const b = document.createElement('div');
-            b.className = 'color-btn';
-            b.style.background = c;
-            b.onclick = (e) => {
-                e.stopPropagation();
-                document.getElementById('view' + n).style.background = c;
-                sel.style.display = 'none';
-            };
-            sel.appendChild(b);
+async function sync() {
+    try {
+        const res = await fetch(BIN_URL, {
+            headers: { "X-Master-Key": API_KEY }
         });
-    }
-    initPalette(1); initPalette(2);
+        const data = await res.json();
+        const live = data.record.live;
 
-    function toggleColors(n) {
-        const s = document.getElementById('sel' + n);
-        s.style.display = (s.style.display === 'grid') ? 'none' : 'grid';
-    }
+        if (!live) return;
 
-    async function sync() {
-        try {
-            const r = await fetch(URL_LIVE);
-            const data = await r.json();
-            if (data) {
-                state = data;
-                updateUI('pts1', state.ptsA);
-                updateUI('pts2', state.ptsB);
-                updateUI('sets1', state.setsA);
-                updateUI('sets2', state.setsB);
-                
-                if (document.activeElement.tagName !== 'DIV') {
-                   // Обновляем имена только если не редактируем
-                   document.getElementById('t1p1').innerText = state.teamA || "А";
-                   document.getElementById('t2p1').innerText = state.teamB || "Б";
-                }
-            }
-        } catch (e) { console.warn("Ожидание данных..."); }
-    }
-
-    function updateUI(id, val) {
-        const el = document.getElementById(id);
-        if (el && el.innerText != val) {
-            el.innerText = val;
-            el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+        // Обновляем только если данные реально изменились (экономим ресурсы)
+        updateUI('pts1', live.ptsA);
+        updateUI('pts2', live.ptsB);
+        updateUI('sets1', live.setsA);
+        updateUI('sets2', live.setsB);
+        
+        if (document.activeElement.tagName !== 'DIV') {
+            document.getElementById('t1p1').innerText = live.teamA;
+            document.getElementById('t2p1').innerText = live.teamB;
         }
+    } catch (e) { console.warn("Синхронизация..."); }
+}
+
+function updateUI(id, val) {
+    const el = document.getElementById(id);
+    if (el && el.innerText != val) {
+        el.innerText = val;
+        el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     }
+}
 
-    async function changeV(key, d) {
-        state[key] = Math.max(0, (state[key] || 0) + d);
-        if (key.includes('sets') && d > 0) { state.ptsA = 0; state.ptsB = 0; }
-
-        // Визуальный отклик сразу
-        updateUI(key.replace('ptsA','pts1').replace('ptsB','pts2').replace('setsA','sets1').replace('setsB','sets2'), state[key]);
-
-        try {
-            await fetch(URL_LIVE, {
-                method: 'PUT',
-                mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(state)
-            });
-        } catch (e) { 
-            console.error("Ошибка сохранения в базу");
-            // Убираем alert, чтобы не мешал работать
-        }
-    }
-
-    document.addEventListener('contextmenu', e => {
-        if (e.target.className === 'points' || e.target.className === 'sets') e.preventDefault();
-    });
-
-    setInterval(sync, 2000);
-    sync();
-</script>
-</body>
-</html>
+// Опрос раз в 2 секунды, чтобы не превысить лимиты JSONbin
+setInterval(sync, 2000);
+sync();
