@@ -1,29 +1,33 @@
 // === ВСТАВЬ СВОИ ДАННЫЕ ===
 const BIN_ID = "699d793843b1c97be9992f8e";
 const API_KEY = "$2a$10$/UoMSo.IHG9Ssn7UvReGie74mZa8ExFNAbIr8rBfOE.mg8uJk.vbS"; 
-const BIN_URL = "https://api.jsonbin.io" + BIN_ID + "/latest";
+// Параметр meta=false упрощает структуру ответа
+const BIN_URL = "https://api.jsonbin.io" + BIN_ID + "/latest?meta=false";
 
 async function sync() {
     try {
         const res = await fetch(BIN_URL, {
             headers: { "X-Master-Key": API_KEY }
         });
-        const data = await res.json();
-        const live = data.record.live;
+        const live = await res.json(); // С meta=false данные сразу тут
 
         if (!live) return;
 
-        // Обновляем только если данные реально изменились (экономим ресурсы)
         updateUI('pts1', live.ptsA);
         updateUI('pts2', live.ptsB);
         updateUI('sets1', live.setsA);
         updateUI('sets2', live.setsB);
         
         if (document.activeElement.tagName !== 'DIV') {
-            document.getElementById('t1p1').innerText = live.teamA;
-            document.getElementById('t2p1').innerText = live.teamB;
+            // Разделяем фамилии, если они введены через "/"
+            const nA = live.teamA.split('/');
+            const nB = live.teamB.split('/');
+            document.getElementById('t1p1').innerText = nA[0] || "";
+            document.getElementById('t1p2').innerText = nA[1] || "";
+            document.getElementById('t2p1').innerText = nB[0] || "";
+            document.getElementById('t2p2').innerText = nB[1] || "";
         }
-    } catch (e) { console.warn("Синхронизация..."); }
+    } catch (e) { console.warn("Поиск данных..."); }
 }
 
 function updateUI(id, val) {
@@ -34,6 +38,5 @@ function updateUI(id, val) {
     }
 }
 
-// Опрос раз в 2 секунды, чтобы не превысить лимиты JSONbin
-setInterval(sync, 2000);
+setInterval(sync, 2500); // Опрос раз в 2.5 сек, чтобы не перегружать сервис
 sync();
