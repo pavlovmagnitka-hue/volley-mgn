@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Volley MGN - REMOTE</title>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 10px; touch-action: manipulation; }
+        .info { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-bottom: 4px solid #fc0; font-weight: bold; font-size: 18px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .score { font-size: 80px; font-weight: 900; margin: 5px 0; line-height: 1.2; color: #fff; }
+        .sets { font-size: 24px; color: #fc0; background: #222; padding: 5px 15px; border-radius: 5px; display: inline-block; min-width: 30px; }
+        .btn-p { width: 100%; height: 120px; font-size: 60px; background: #28a745; color: white; border: none; border-radius: 12px; box-shadow: 0 5px #1e7e34; cursor: pointer; }
+        .btn-p:active { transform: translateY(4px); box-shadow: none; }
+        .btn-m { width: 100%; height: 50px; background: #dc3545; color: white; border: none; border-radius: 8px; margin-top: 10px; opacity: 0.8; font-size: 20px; }
+        .actions { margin-top: 30px; display: flex; gap: 10px; }
+        .act-btn { flex: 1; padding: 20px; background: #444; border: none; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .to-on { background: #f00 !important; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+<div class="info">
+    <span id="nA">ЗАГРУЗКА...</span> vs <span id="nB">...</span>
+</div>
+
+<div class="grid">
+    <div>
+        <div class="sets" id="sA" onclick="mod('setsA', 1)">0</div>
+        <div class="score" id="pA">0</div>
+        <button class="btn-p" onclick="mod('ptsA', 1)">+</button>
+        <button class="btn-m" onclick="mod('ptsA', -1)">-1</button>
+    </div>
+    <div>
+        <div class="sets" id="sB" onclick="mod('setsB', 1)">0</div>
+        <div class="score" id="pB">0</div>
+        <button class="btn-p" onclick="mod('ptsB', 1)">+</button>
+        <button class="btn-m" onclick="mod('ptsB', -1)">-1</button>
+    </div>
+</div>
+
+<div class="actions">
+    <button class="act-btn" id="toBtn" onclick="toggleTO()">ТАЙМ-АУТ</button>
+    <button class="act-btn" onclick="swap()">СМЕНА СТОРОН</button>
+</div>
+
+<script>
+    // Ссылка на узел live.json, где лежат данные текущего матча
+    const DB_LIVE = "https://volleyscoremgn-default-rtdb.firebaseio.com";
+    
+    let state = { teamA: "Команда А", teamB: "Команда Б", ptsA: 0, ptsB: 0, setsA: 0, setsB: 0, timeout: false, sideSwap: false };
+
+    async function sync() {
+        try {
+            const r = await fetch(DB_LIVE);
+            const data = await r.json();
+            if(data) {
+                state = data;
+                // Отображаем названия в зависимости от того, была ли смена сторон
+                document.getElementById('nA').innerText = state.sideSwap ? state.teamB : state.teamA;
+                document.getElementById('nB').innerText = state.sideSwap ? state.teamA : state.teamB;
+                
+                // Очки и сеты подтягиваем напрямую
+                document.getElementById('pA').innerText = state.ptsA;
+                document.getElementById('pB').innerText = state.ptsB;
+                document.getElementById('sA').innerText = state.setsA;
+                document.getElementById('sB').innerText = state.setsB;
+                
+                document.getElementById('toBtn').className = state.timeout ? "act-btn to-on" : "act-btn";
+            }
+        } catch(e) { console.error("Ошибка сети:", e); }
+    }
+
+    async function sendUpdate() {
+        try {
+            await fetch(DB_LIVE, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(state) 
+            });
+        } catch(e) { console.error("Ошибка записи:", e); }
+    }
+
+    function mod(key, d) {
+        state[key] = Math.max(0, (state[key] || 0) + d);
+        
+        // Авто-сброс очков при изменении сета (в плюс)
+        if(key.includes('sets') && d > 0) { 
+            state.ptsA = 0; 
+            state.ptsB = 0; 
+        }
+        
+        sendUpdate();
+        updateUI(); // Мгновенный отклик в интерфейсе пульта
+    }
+
+    function toggleTO() {
+        state.timeout = !state.timeout;
+        sendUpdate();
+        updateUI();
+    }
+
+    function swap() {
+        // Меняем флаг стороны. Score.html должен уметь читать этот флаг.
+        state.sideSwap = !state.sideSwap;
+        
+        // Меняем местами очки и сеты для физических кнопок пульта
+        let tempPts = state.ptsA; state.ptsA = state.ptsB; state.ptsB = tempPts;
+        let tempSets = state.setsA; state.setsA = state.setsB; state.setsB = tempSets;
+        // Названия команд НЕ меняем в базе, чтобы не ломать логику турнира
+        
+        sendUpdate();
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('pA').innerText = state.ptsA;
+        document.getElementById('pB').innerText = state.ptsB;
+        document.getElementById('sA').innerText = state.setsA;
+        document.getElementById('sB').innerText = state.setsB;
+        document.getElementById('nA').innerText = state.sideSwap ? state.teamB : state.teamA;
+        document.getElementById('nB').innerText = state.sideSwap ? state.teamA : state.teamB;
+    }
+
+    // Опрос базы раз в 2 секунды (на случай если кто-то другой изменит счет)
+    setInterval(sync, 2000);
+    sync();
+</script>
+</body>
+</html>
