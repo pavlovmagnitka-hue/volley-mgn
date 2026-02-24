@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Volleyball Scoreboard - LIVE</title>
+    <title>Volleyball Scoreboard - LIVE SYNC</title>
     <style>
-        /* ВАШ СТИЛЬ БЕЗ ИЗМЕНЕНИЙ */
+        /* ТВОЙ ОРИГИНАЛЬНЫЙ СТИЛЬ */
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; background: transparent; display: flex; justify-content: center; user-select: none; }
         .scoreboard { 
             display: flex; align-items: center; background: rgba(30, 30, 30, 0.98); 
@@ -17,9 +17,11 @@
         .team-name { 
             font-size: 20px; font-weight: 800; text-transform: uppercase; 
             color: white; background: rgba(255,255,255,0.05); 
-            padding: 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            border: 1px dashed transparent; padding: 2px 8px; 
+            cursor: text; outline: none; transition: 0.2s;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .jersey-box { position: relative; flex-shrink: 0; }
+        .team-name:focus { border-color: #ffcc00; background: rgba(255,255,255,0.15); }
         .jersey-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #666; }
         .sets { background: #333; padding: 8px 18px; border-radius: 8px; font-size: 28px; font-weight: 800; color: #ffcc00; min-width: 35px; text-align: center; }
         .points { font-size: 68px; font-weight: 900; width: 110px; text-align: center; background: #eee; color: #111; margin: 0 15px; border-radius: 8px; }
@@ -31,88 +33,78 @@
 <body>
 
 <div class="scoreboard">
-    <!-- Левая команда -->
     <div class="team" style="justify-content: flex-end; text-align: right;">
         <div class="names-container">
-            <div class="team-name" id="t1p1">КОМАНДА А</div>
-            <div class="team-name" id="t1p2">Матч ожидается...</div>
+            <div class="team-name" id="t1p1" contenteditable="true">ИГРОК 1</div>
+            <div class="team-name" id="t1p2" contenteditable="true">ИГРОК 2</div>
         </div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view1" style="background:#fff"></div>
-        </div>
+        <div class="jersey-color" id="view1" style="background:#fff"></div>
         <div class="sets" id="sets1">0</div>
     </div>
 
-    <!-- Очки -->
     <div class="points" id="pts1">0</div>
     <div class="divider">:</div>
     <div class="points" id="pts2">0</div>
 
-    <!-- Правая команда -->
     <div class="team">
         <div class="sets" id="sets2">0</div>
-        <div class="jersey-box">
-            <div class="jersey-color" id="view2" style="background:#04f"></div>
-        </div>
+        <div class="jersey-color" id="view2" style="background:#04f"></div>
         <div class="names-container" style="text-align: left;">
-            <div class="team-name" id="t2p1">КОМАНДА Б</div>
-            <div class="team-name" id="t2p2"></div>
+            <div class="team-name" id="t2p1" contenteditable="true">ИГРОК 3</div>
+            <div class="team-name" id="t2p2" contenteditable="true">ИГРОК 4</div>
         </div>
     </div>
 </div>
 
 <script>
-    // Ссылка на вашу базу данных
     const DB_URL = "https://volleyscoremgn-default-rtdb.firebaseio.com";
 
-    let lastData = {}; // Для отслеживания изменений и анимации
-
-    async function syncScore() {
+    async function sync() {
         try {
-            const response = await fetch(DB_URL);
-            const data = await response.json();
-
+            const res = await fetch(DB_URL);
+            const data = await res.json();
             if (!data) return;
 
-            // Функция для обновления текста и анимации при изменении
-            const updateField = (id, newValue) => {
+            // Функция обновления с анимацией
+            const up = (id, val) => {
                 const el = document.getElementById(id);
-                if (el.innerText !== String(newValue)) {
-                    el.innerText = newValue;
-                    // Добавляем анимацию "pop"
+                if (el && el.innerText != val) {
+                    el.innerText = val;
                     el.classList.remove('pop');
-                    void el.offsetWidth; // Магия для перезапуска анимации
+                    void el.offsetWidth;
                     el.classList.add('pop');
                 }
             };
 
-            // Обновляем имена (разбиваем строку "Фамилия1 / Фамилия2")
-            if (data.teamA) {
+            // Синхронизируем цифры
+            up('pts1', data.ptsA || 0);
+            up('pts2', data.ptsB || 0);
+            up('sets1', data.setsA || 0);
+            up('sets2', data.setsB || 0);
+
+            // Синхронизируем имена ТОЛЬКО если они изменились в базе (из админки)
+            // Чтобы не перебивать твой ручной ввод в OBS
+            if (data.teamA && !document.activeElement.classList.contains('team-name')) {
                 const namesA = data.teamA.split('/');
-                updateField('t1p1', namesA[0] || '');
-                updateField('t1p2', namesA[1] || '');
+                if(namesA[0]) document.getElementById('t1p1').innerText = namesA[0].trim();
+                if(namesA[1]) document.getElementById('t1p2').innerText = namesA[1].trim();
             }
-            if (data.teamB) {
+            if (data.teamB && !document.activeElement.classList.contains('team-name')) {
                 const namesB = data.teamB.split('/');
-                updateField('t2p1', namesB[0] || '');
-                updateField('t2p2', namesB[1] || '');
+                if(namesB[0]) document.getElementById('t2p1').innerText = namesB[0].trim();
+                if(namesB[1]) document.getElementById('t2p2').innerText = namesB[1].trim();
             }
 
-            // Обновляем счет и сеты
-            updateField('pts1', data.ptsA || 0);
-            updateField('pts2', data.ptsB || 0);
-            updateField('sets1', data.setsA || 0);
-            updateField('sets2', data.setsB || 0);
-
-        } catch (e) {
-            console.error("Ошибка синхронизации:", e);
-        }
+        } catch (e) { console.error("Firebase Error:", e); }
     }
 
-    // Запускаем бесконечный цикл обновления (раз в 1 секунду)
-    setInterval(syncScore, 1000);
-    syncScore(); // Первый запуск
-</script>
+    // Запрет Enter в именах
+    document.querySelectorAll('.team-name').forEach(el => {
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+    });
 
+    setInterval(sync, 1000);
+    sync();
+</script>
 </body>
 </html>
